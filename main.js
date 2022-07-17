@@ -1,9 +1,37 @@
+String.prototype.hexDecode = function(){
+    var j;
+    var hexes = this.match(/.{1,4}/g) || [];
+    var back = "";
+    for(j = 0; j<hexes.length; j++) {
+        back += String.fromCharCode(parseInt(hexes[j], 16));
+    }
+
+    return back;
+}
+
+String.prototype.hexEncode = function(){
+    var hex, i;
+
+    var result = "";
+    for (i=0; i<this.length; i++) {
+        hex = this.charCodeAt(i).toString(16);
+        result += ("000"+hex).slice(-4);
+    }
+
+    return result
+}
+
 const zero = '(+![])';
 const one = '(+!![])';
 
 const number = n => {
-    if (n === 0) return zero;
-    return Array.from({length: n}, () => one).join('+');
+    if (n == 0) return zero;
+    if (n < 10) {
+        return Array.from({length: n}, () => one).join('+');
+    }
+
+    n = n + [];
+    return `+(${Array.from(n).map(l => `[${number(l)}]`).join('+')})`;
 }
 
 map = {}
@@ -29,9 +57,9 @@ map[" "] = `${fill}[${number(8)}]`;
 map["("] = `${fill}[${number(13)}]`;
 map[")"] = `${fill}[${number(14)}]`;
 map["{"] = `${fill}[${number(16)}]`;
-map["}"] = `${fill}[${number(32)}]`;
-map["["] = `${fill}[${number(18)}]`;
-map["]"] = `${fill}[${number(30)}]`;
+map["}"] = `${fill}[${number(36)}]`;
+map["["] = `${fill}[${number(22)}]`;
+map["]"] = `${fill}[${number(34)}]`;
 
 const nonFullToString = (s) => {
     return Array.from(s).map(l => {
@@ -65,13 +93,18 @@ const letter = (l) => {
         return `(${n})[${toStr}](${number(36)})`;
     }
 
-    console.log(`Missing ${l}`);
-    return undefined;
+    try {
+        return anyUnicode(l);
+    } catch(e) {
+        console.log(`Missing ${l}`);
+        return undefined;
+    }
 }
 
 const str = (s) => Array.from(s).map(letter).join('+');
 
 map["."] = `((+(${str("11e20")}))+[])[${number(1)}]`;
+map["+"] = `((+(${str("1e100")}))+[])[${number(2)}]`;
 
 const func = (s) => `[][${str("fill")}][${str("constructor")}](${str(s)})`;
 const funcEval = (s) => `${func(s)}()`
@@ -84,7 +117,13 @@ map["E"] = `(${tryC}+[])[${number(5)}]`;
 
 const regexConstr = funcEval("return RegExp");
 map["/"] = `(${regexConstr}()+[])[${number(0)}]`;
-map["\\"] = `(${regexConstr}(${letter("/")})+[${number(1)}])`;
+map["\\"] = `(${regexConstr}(${letter("/")})+[])[${number(1)}]`;
 map[","] = `[]+[[]][${str("concat")}]([[]])`;
+map["F"] = `([][${str("fill")}][${str("constructor")}]+[])[${number(9)}]`;
 
-const syntaxErr = `${str("try{")}${funcNoStr(letter(","))}${str("}catch(f){return f}")}`;
+const syntaxErr = funcEval(`try{Function([]+[[]].concat([[]]))}catch(f){return f}`);
+map["'"] = `(${syntaxErr}+[])[${number(38)}]`;
+
+const anyUnicode = (c) => `${funcEval("return '" + '\\' + `u${c.hexEncode()}'`)}`
+
+const compile = (s) => funcEval(s);
